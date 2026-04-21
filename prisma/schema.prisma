@@ -1,0 +1,137 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users                 User[]
+  products              Product[]
+  pricingRecommendations PricingRecommendation[]
+  priceChanges          PriceChange[]
+  orgConfig             OrgConfig?
+
+  @@map("organizations")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("ANALYST") // ADMIN | ANALYST
+  createdAt DateTime @default(now()) @map("created_at")
+
+  org             Organization     @relation(fields: [orgId], references: [id])
+  approvalActions ApprovalAction[]
+
+  @@map("users")
+}
+
+model Product {
+  id           String   @id @default(uuid())
+  orgId        String   @map("org_id")
+  sku          String
+  name         String
+  category     String
+  currentPrice Float    @map("current_price")
+  cogs         Float    @default(0)
+  stockQty     Int      @default(0) @map("stock_qty")
+  imageUrl     String?  @map("image_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  org                   Organization          @relation(fields: [orgId], references: [id])
+  competitorPrices      CompetitorPrice[]
+  pricingRecommendations PricingRecommendation[]
+  priceChanges          PriceChange[]
+
+  @@unique([orgId, sku])
+  @@map("products")
+}
+
+model CompetitorPrice {
+  id             String   @id @default(uuid())
+  productId      String   @map("product_id")
+  competitorName String   @map("competitor_name")
+  price          Float
+  capturedAt     DateTime @default(now()) @map("captured_at")
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("competitor_prices")
+}
+
+model PricingRecommendation {
+  id               String   @id @default(uuid())
+  productId        String   @map("product_id")
+  orgId            String   @map("org_id")
+  status           String   @default("PENDING") // PENDING | APPROVED | REJECTED | EXECUTED
+  recommendedPrice Float    @map("recommended_price")
+  confidenceScore  Int      @map("confidence_score") // 0-100
+  rationale        String
+  agentOutputs     String   @map("agent_outputs") // JSON string
+  createdAt        DateTime @default(now()) @map("created_at")
+  resolvedAt       DateTime? @map("resolved_at")
+
+  product         Product          @relation(fields: [productId], references: [id])
+  org             Organization     @relation(fields: [orgId], references: [id])
+  approvalActions ApprovalAction[]
+  priceChanges    PriceChange[]
+
+  @@map("pricing_recommendations")
+}
+
+model ApprovalAction {
+  id               String   @id @default(uuid())
+  recommendationId String   @map("recommendation_id")
+  userId           String   @map("user_id")
+  action           String   // APPROVE | REJECT | MODIFY
+  overridePrice    Float?   @map("override_price")
+  reason           String?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  recommendation PricingRecommendation @relation(fields: [recommendationId], references: [id])
+  user           User                  @relation(fields: [userId], references: [id])
+
+  @@map("approval_actions")
+}
+
+model PriceChange {
+  id               String   @id @default(uuid())
+  productId        String   @map("product_id")
+  orgId            String   @map("org_id")
+  oldPrice         Float    @map("old_price")
+  newPrice         Float    @map("new_price")
+  triggeredBy      String   @map("triggered_by") // AI | MANUAL | OVERRIDE
+  recommendationId String?  @map("recommendation_id")
+  executedAt       DateTime @default(now()) @map("executed_at")
+
+  product        Product                @relation(fields: [productId], references: [id])
+  org            Organization           @relation(fields: [orgId], references: [id])
+  recommendation PricingRecommendation? @relation(fields: [recommendationId], references: [id])
+
+  @@map("price_changes")
+}
+
+model OrgConfig {
+  id                     String @id @default(uuid())
+  orgId                  String @unique @map("org_id")
+  autoExecuteThreshold   Int    @default(90) @map("auto_execute_threshold") // confidence score threshold
+  marginFloorByCategory  String @default("{}") @map("margin_floor_by_category") // JSON
+  maxDiscountPercent     Float  @default(25) @map("max_discount_percent")
+  escalationRules        String @default("{}") @map("escalation_rules") // JSON
+
+  org Organization @relation(fields: [orgId], references: [id])
+
+  @@map("org_config")
+}
