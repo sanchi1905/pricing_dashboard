@@ -89,16 +89,38 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-sm">
+        <div className="mt-6 flex flex-col gap-3 text-center text-sm">
           <p className="text-gray-500">
             Don&apos;t have an account?{' '}
             <Link href="/signup" className="text-blue-500 hover:underline">
               Create Organization
             </Link>
           </p>
+          
+          <div className="pt-4 border-t border-white/5">
+            <button 
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  const res = await fetch('/api/auth/seed', { method: 'POST' });
+                  const data = await res.json();
+                  if (res.ok) alert('✨ Demo data seeded successfully! You can now login.');
+                  else alert(data.error || 'Seed failed');
+                } catch {
+                  alert('Connection failed');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              disabled={loading}
+              className="text-xs text-gray-500 hover:text-blue-400 transition-colors"
+            >
+              First time? Seed Demo Data
+            </button>
+          </div>
         </div>
         
-        <div className="mt-8 pt-6 border-t border-white/5 text-center text-xs text-gray-600">
+        <div className="mt-6 pt-6 border-t border-white/5 text-center text-xs text-gray-600">
           <p>Demo accounts:</p>
           <p>admin@techmart.com / admin123 (ADMIN)</p>
           <p>analyst@techmart.com / analyst123 (ANALYST)</p>
