@@ -71,8 +71,9 @@ export async function POST() {
       { sku: 'TM-PS5-SLIM', name: 'PlayStation 5 Slim', category: 'Gaming', price: 499.0, cogs: 410.0, stock: 60 },
     ];
 
+    const createdProducts = [];
     for (const p of products) {
-      await prisma.product.create({
+      const product = await prisma.product.create({
         data: {
           id: uuid(),
           orgId: techMart.id,
@@ -84,6 +85,37 @@ export async function POST() {
           stockQty: p.stock,
         },
       });
+      createdProducts.push(product);
+    }
+
+    // Create some recommendations
+    for (const product of createdProducts) {
+      await prisma.pricingRecommendation.create({
+        data: {
+          id: uuid(),
+          productId: product.id,
+          orgId: techMart.id,
+          status: 'PENDING',
+          recommendedPrice: product.currentPrice * 0.95,
+          confidenceScore: 85 + Math.floor(Math.random() * 10),
+          rationale: `Based on analysis of 5 competitors and stable demand in the ${product.category} category.`,
+          agentOutputs: JSON.stringify({}),
+        },
+      });
+
+      // Create some historical price changes for the chart
+      for (let i = 1; i <= 5; i++) {
+        await prisma.priceChange.create({
+          data: {
+            productId: product.id,
+            orgId: techMart.id,
+            oldPrice: product.currentPrice * (1 + (i * 0.02)),
+            newPrice: product.currentPrice * (1 + ((i - 1) * 0.02)),
+            triggeredBy: 'AI',
+            executedAt: new Date(Date.now() - (i * 24 * 60 * 60 * 1000)),
+          },
+        });
+      }
     }
 
     return NextResponse.json({ message: 'Success! Demo data seeded.' });
